@@ -33,9 +33,14 @@ def lambda_handler(event, context):
         logger.error(error)
         raise Exception(error)
 
-    if query_string_parameters["hub"]["mode"] == "subscribe" and query_string_parameters["hub"]["challenge"]:
+    # Define all necessary variables.
+    hub_mode = query_string_parameters.get("hub.mode", None)
+    hub_challenge = query_string_parameters.get("hub.challenge", None)
+    hub_verify_token = query_string_parameters.get("hub.verify_token", None)
+
+    if hub_mode == "subscribe" and hub_challenge:
         # Check the verify token value.
-        if query_string_parameters["hub"]["verify_token"] != FACEBOOK_MESSENGER_BOT_VERIFY_TOKEN:
+        if hub_verify_token != FACEBOOK_MESSENGER_BOT_VERIFY_TOKEN:
             return {
                 "statusCode": 403,
                 "body": "Verification token mismatch. Check your 'VERIFY_TOKEN'."
@@ -44,7 +49,7 @@ def lambda_handler(event, context):
         # You must echo back the "hub.challenge" value, when the endpoint is registered as a webhook.
         return {
             "statusCode": 200,
-            "body": query_string_parameters["hub"]["challenge"]
+            "body": hub_challenge
         }
 
     # Return the status code 200.
