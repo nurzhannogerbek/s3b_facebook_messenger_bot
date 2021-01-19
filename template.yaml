@@ -73,25 +73,6 @@ Resources:
               audience:
                 - 'Fn::Sub': '${Auth0Audience}'
             IdentitySource: $request.header.Authorization
-  SetWebhookForFacebookMessenger:
-    Type: 'AWS::Serverless::Function'
-    Properties:
-      FunctionName:
-        'Fn::Sub': '${EnvironmentName}SetWebhookForFacebookMessenger'
-      CodeUri: src/aws_lambda_functions/set_webhook_for_facebook_messenger
-      Handler: lambda_function.lambda_handler
-      Events:
-        FacebookMessengerApiGateway:
-          Type: HttpApi
-          Properties:
-            ApiId:
-              Ref: FacebookMessengerApiGateway
-            Path: '/{business_account}'
-            Method: GET
-      Environment:
-        Variables:
-          FACEBOOK_MESSENGER_BOT_VERIFY_TOKEN:
-            'Fn::Sub': '${FacebookMessengerBotVerifyToken}'
   SendMessageFromFacebookMessenger:
     Type: 'AWS::Serverless::Function'
     Properties:
@@ -100,13 +81,24 @@ Resources:
       CodeUri: src/aws_lambda_functions/send_message_from_facebook_messenger
       Handler: lambda_function.lambda_handler
       Events:
-        FacebookMessengerApiGateway:
+        FacebookMessengerApiGatewayGetRequest:
           Type: HttpApi
           Properties:
             ApiId:
               Ref: FacebookMessengerApiGateway
-            Path: '/{business_account}'
+            Path: '/send_message_from_facebook_messenger/{business_account}'
+            Method: GET
+        FacebookMessengerApiGatewayPostRequest:
+          Type: HttpApi
+          Properties:
+            ApiId:
+              Ref: FacebookMessengerApiGateway
+            Path: '/send_message_from_facebook_messenger/{business_account}'
             Method: POST
+      Environment:
+        Variables:
+          FACEBOOK_MESSENGER_BOT_VERIFY_TOKEN:
+            'Fn::Sub': '${FacebookMessengerBotVerifyToken}'
       Layers:
         - 'Fn::Sub': '${DatabasesLayerARN}'
         - 'Fn::Sub': '${RequestsLayerARN}'
