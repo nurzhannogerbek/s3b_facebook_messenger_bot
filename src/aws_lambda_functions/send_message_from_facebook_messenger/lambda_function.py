@@ -70,7 +70,7 @@ def lambda_handler(event, context):
     # Check the http method of the request.
     if http_method == "GET":
         # Set the webhook for facebook messenger bot.
-        set_webhook_for_facebook_messenger(query_string_parameters)
+        response = set_webhook_for_facebook_messenger(query_string_parameters)
 
-    # Return nothing.
-    return None
+    # Return response.
+    return response
