@@ -86,14 +86,14 @@ Resources:
           Properties:
             ApiId:
               Ref: FacebookMessengerApiGateway
-            Path: '/send_message_from_facebook_messenger/{business_account}'
+            Path: '/'
             Method: GET
         FacebookMessengerApiGatewayPostRequest:
           Type: HttpApi
           Properties:
             ApiId:
               Ref: FacebookMessengerApiGateway
-            Path: '/send_message_from_facebook_messenger/{business_account}'
+            Path: '/'
             Method: POST
       Environment:
         Variables:
