@@ -20,7 +20,6 @@ POSTGRESQL_PASSWORD = os.environ["POSTGRESQL_PASSWORD"]
 POSTGRESQL_HOST = os.environ["POSTGRESQL_HOST"]
 POSTGRESQL_PORT = int(os.environ["POSTGRESQL_PORT"])
 POSTGRESQL_DB_NAME = os.environ["POSTGRESQL_DB_NAME"]
-TELEGRAM_API_URL = "https://api.telegram.org"
 APPSYNC_CORE_API_URL = os.environ["APPSYNC_CORE_API_URL"]
 APPSYNC_CORE_API_KEY = os.environ["APPSYNC_CORE_API_KEY"]
 FACEBOOK_API_URL = "https://graph.facebook.com/v9.0"
@@ -318,7 +317,12 @@ def get_identified_user_data(**kwargs) -> AnyStr:
         raise Exception(error)
 
     # Return the id of the user.
-    return cursor.fetchone()["user_id"]
+    result = cursor.fetchone()
+    if result is None:
+        user_id = None
+    else:
+        user_id = result["user_id"]
+    return user_id
 
 
 @postgresql_wrapper
@@ -352,12 +356,10 @@ def create_identified_user(**kwargs) -> AnyStr:
     parameters = {
         "fields": "id,age_range,birthday,email,favorite_athletes,favorite_teams,first_name,gender,hometown,"
                   "inspirational_people,install_type,installed,is_guest_user,languages,last_name,location,"
-                  "meeting_for,middle_name,name,name_format,payment_pricepoints,profile_pic,quotes,"
-                  "shared_login_upgrade_required_by,short_name,significant_other,sports,"
-                  "supports_donate_button_in_live_video,video_upload_limits,accounts,ad_studies,adaccounts,albums,"
-                  "apprequestformerrecipients,apprequests,assigned_business_asset_groups,business_users,businesses,"
-                  "conversations,feed,friends,groups,likes,live_encoders,live_videos,music,permissions,"
-                  "personal_ad_accounts,photos,picture,videos",
+                  "meeting_for,middle_name,name,name_format,payment_pricepoints,profile_pic,quotes,short_name,"
+                  "significant_other,sports,supports_donate_button_in_live_video,video_upload_limits,accounts,"
+                  "ad_studies,albums,apprequests,assigned_business_asset_groups,business_users,conversations,feed,"
+                  "friends,groups,likes,live_encoders,live_videos,music,photos,picture,videos",
         "access_token": facebook_messenger_bot_token
     }
 
@@ -371,9 +373,9 @@ def create_identified_user(**kwargs) -> AnyStr:
         raise Exception(error)
 
     # Define a few necessary variables that will be used in the future.
-    sql_arguments["metadata"] = response
-    sql_arguments["identified_user_first_name"] = response["first_name"]
-    sql_arguments["identified_user_last_name"] = response["last_name"]
+    sql_arguments["metadata"] = json.dumps(response.json())
+    sql_arguments["identified_user_first_name"] = response.json().get("first_name", None)
+    sql_arguments["identified_user_last_name"] = response.json().get("last_name", None)
 
     # Prepare the SQL query that creates identified user.
     sql_statement = """
@@ -381,7 +383,7 @@ def create_identified_user(**kwargs) -> AnyStr:
         identified_user_first_name,
         identified_user_last_name,
         metadata,
-        telegram_username
+        facebook_messenger_psid
     ) values(
         %(identified_user_first_name)s,
         %(identified_user_last_name)s,
