@@ -913,6 +913,16 @@ def lambda_handler(event, context):
 
                     # Check if it's the "message" and not the "read status" or the "reaction".
                     if message:
+                        # Define the value of the message text.
+                        message_text = message.get("text", None)
+
+                        # Define the value of the facebook application id.
+                        app_id = message.get("app_id", None)
+
+                        # Stop processing the request if the application has sent a message.
+                        if app_id is not None:
+                            break
+
                         # Define the sender's id (user id).
                         try:
                             sender_id = messaging["sender"]["id"]
@@ -937,9 +947,6 @@ def lambda_handler(event, context):
                                 "business_account": recipient_id
                             }
                         )
-
-                        # Define the value of the message text.
-                        message_text = message.get("text", None)
 
                         # Check if message text is available.
                         if message_text:
