@@ -475,15 +475,6 @@ def create_chat_room(**kwargs) -> json:
             chatRoomId
             chatRoomStatus
             client {
-                country {
-                    countryAlpha2Code
-                    countryAlpha3Code
-                    countryCodeTopLevelDomain
-                    countryId
-                    countryNumericCode
-                    countryOfficialName
-                    countryShortName
-                }
                 gender {
                     genderId
                     genderPublicName
@@ -593,15 +584,6 @@ def activate_closed_chat_room(**kwargs):
             chatRoomId
             chatRoomStatus
             client {
-                country {
-                    countryAlpha2Code
-                    countryAlpha3Code
-                    countryCodeTopLevelDomain
-                    countryId
-                    countryNumericCode
-                    countryOfficialName
-                    countryShortName
-                }
                 gender {
                     genderId
                     genderPublicName
