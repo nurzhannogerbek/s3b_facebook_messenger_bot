@@ -354,12 +354,7 @@ def create_identified_user(**kwargs) -> AnyStr:
 
     # Create the parameters.
     parameters = {
-        "fields": "id,age_range,birthday,email,favorite_athletes,favorite_teams,first_name,gender,hometown,"
-                  "inspirational_people,install_type,installed,is_guest_user,languages,last_name,location,"
-                  "meeting_for,middle_name,name,name_format,payment_pricepoints,profile_pic,quotes,short_name,"
-                  "significant_other,sports,supports_donate_button_in_live_video,video_upload_limits,accounts,"
-                  "ad_studies,albums,apprequests,assigned_business_asset_groups,business_users,conversations,feed,"
-                  "friends,groups,likes,live_encoders,live_videos,music,photos,picture,videos",
+        "fields": "id,first_name,last_name,middle_name,name,name_format,picture,short_name",
         "access_token": facebook_messenger_bot_token
     }
 
