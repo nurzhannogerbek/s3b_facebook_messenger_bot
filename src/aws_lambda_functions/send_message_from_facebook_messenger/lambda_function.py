@@ -173,7 +173,7 @@ def get_facebook_messenger_bot_token(**kwargs) -> AnyStr:
     # Define the value of the facebook messenger bot token.
     try:
         facebook_messenger_bot_token = cursor.fetchone()["facebook_messenger_bot_token"]
-    except KeyError:
+    except TypeError:
         facebook_messenger_bot_token = None
 
     # Return facebook messenger's chat bot token.
