@@ -170,8 +170,14 @@ def get_facebook_messenger_bot_token(**kwargs) -> AnyStr:
         logger.error(error)
         raise Exception(error)
 
+    # Define the value of the facebook messenger bot token.
+    try:
+        facebook_messenger_bot_token = cursor.fetchone()["facebook_messenger_bot_token"]
+    except KeyError:
+        facebook_messenger_bot_token = None
+
     # Return facebook messenger's chat bot token.
-    return cursor.fetchone()["facebook_messenger_bot_token"]
+    return facebook_messenger_bot_token
 
 
 def send_message_to_facebook_messenger(**kwargs) -> None:
@@ -921,109 +927,112 @@ def lambda_handler(event, context):
                             }
                         )
 
-                        # Check if message text is available.
-                        if message_text:
-                            # Make up the content value of the last chat room message.
-                            last_message_content = json.dumps({
-                                "messageText": message_text,
-                                "messageContent": None
-                            })
+                        # Check the value of the facebook messenger bot token.
+                        # The value can be none if the message is sent on behalf of the business page.
+                        if facebook_messenger_bot_token:
+                            # Check if message text is available.
+                            if message_text:
+                                # Make up the content value of the last chat room message.
+                                last_message_content = json.dumps({
+                                    "messageText": message_text,
+                                    "messageContent": None
+                                })
 
-                            # Get the aggregated data.
-                            aggregated_data = get_aggregated_data(
-                                postgresql_connection=postgresql_connection,
-                                sql_arguments={
-                                    "facebook_messenger_chat_id": "{0}:{1}".format(recipient_id, sender_id)
-                                }
-                            )
-
-                            # Define several variables that will be used in the future.
-                            if aggregated_data is not None:
-                                chat_room_id = aggregated_data["chat_room_id"]
-                                channel_id = aggregated_data["channel_id"]
-                                chat_room_status = aggregated_data["chat_room_status"]
-                                client_id = aggregated_data["client_id"]
-                            else:
-                                chat_room_id, channel_id, chat_room_status, client_id = None, None, None, None
-
-                            # Check the chat room status.
-                            if chat_room_status is None:
-                                # Check whether the user was registered in the system earlier.
-                                client_id = get_identified_user_data(
+                                # Get the aggregated data.
+                                aggregated_data = get_aggregated_data(
                                     postgresql_connection=postgresql_connection,
                                     sql_arguments={
-                                        "facebook_messenger_psid": sender_id
+                                        "facebook_messenger_chat_id": "{0}:{1}".format(recipient_id, sender_id)
                                     }
                                 )
 
-                                # Create the new user.
-                                if client_id is None:
-                                    client_id = create_identified_user(
+                                # Define several variables that will be used in the future.
+                                if aggregated_data is not None:
+                                    chat_room_id = aggregated_data["chat_room_id"]
+                                    channel_id = aggregated_data["channel_id"]
+                                    chat_room_status = aggregated_data["chat_room_status"]
+                                    client_id = aggregated_data["client_id"]
+                                else:
+                                    chat_room_id, channel_id, chat_room_status, client_id = None, None, None, None
+
+                                # Check the chat room status.
+                                if chat_room_status is None:
+                                    # Check whether the user was registered in the system earlier.
+                                    client_id = get_identified_user_data(
                                         postgresql_connection=postgresql_connection,
                                         sql_arguments={
                                             "facebook_messenger_psid": sender_id
-                                        },
-                                        facebook_messenger_bot_token=facebook_messenger_bot_token
+                                        }
                                     )
 
-                                # Create the new chat room.
-                                chat_room = create_chat_room(
-                                    channel_technical_id=facebook_messenger_bot_token,
-                                    client_id=client_id,
-                                    last_message_content=last_message_content,
-                                    facebook_messenger_chat_id="{0}:{1}".format(recipient_id, sender_id)
-                                )
+                                    # Create the new user.
+                                    if client_id is None:
+                                        client_id = create_identified_user(
+                                            postgresql_connection=postgresql_connection,
+                                            sql_arguments={
+                                                "facebook_messenger_psid": sender_id
+                                            },
+                                            facebook_messenger_bot_token=facebook_messenger_bot_token
+                                        )
 
-                                # Define a few necessary variables that will be used in the future.
-                                try:
-                                    chat_room_id = chat_room["data"]["createChatRoom"]["chatRoomId"]
-                                except Exception as error:
-                                    logger.error(error)
-                                    raise Exception(error)
-                                try:
-                                    channel_id = chat_room["data"]["createChatRoom"]["channelId"]
-                                except Exception as error:
-                                    logger.error(error)
-                                    raise Exception(error)
-                            elif chat_room_status == "completed":
-                                # Activate closed chat room before sending a message to the operator.
-                                activate_closed_chat_room(
+                                    # Create the new chat room.
+                                    chat_room = create_chat_room(
+                                        channel_technical_id=facebook_messenger_bot_token,
+                                        client_id=client_id,
+                                        last_message_content=last_message_content,
+                                        facebook_messenger_chat_id="{0}:{1}".format(recipient_id, sender_id)
+                                    )
+
+                                    # Define a few necessary variables that will be used in the future.
+                                    try:
+                                        chat_room_id = chat_room["data"]["createChatRoom"]["chatRoomId"]
+                                    except Exception as error:
+                                        logger.error(error)
+                                        raise Exception(error)
+                                    try:
+                                        channel_id = chat_room["data"]["createChatRoom"]["channelId"]
+                                    except Exception as error:
+                                        logger.error(error)
+                                        raise Exception(error)
+                                elif chat_room_status == "completed":
+                                    # Activate closed chat room before sending a message to the operator.
+                                    activate_closed_chat_room(
+                                        chat_room_id=chat_room_id,
+                                        client_id=client_id,
+                                        last_message_content=last_message_content
+                                    )
+
+                                # Send the message to the operator and save it in the database.
+                                chat_room_message = create_chat_room_message(
                                     chat_room_id=chat_room_id,
-                                    client_id=client_id,
-                                    last_message_content=last_message_content
+                                    message_author_id=client_id,
+                                    message_channel_id=channel_id,
+                                    message_text=message_text,
+                                    message_content=None
                                 )
 
-                            # Send the message to the operator and save it in the database.
-                            chat_room_message = create_chat_room_message(
-                                chat_room_id=chat_room_id,
-                                message_author_id=client_id,
-                                message_channel_id=channel_id,
-                                message_text=message_text,
-                                message_content=None
-                            )
+                                # Define the id of the created message.
+                                try:
+                                    message_id = chat_room_message["data"]["createChatRoomMessage"]["messageId"]
+                                except Exception as error:
+                                    logger.error(error)
+                                    raise Exception(error)
 
-                            # Define the id of the created message.
-                            try:
-                                message_id = chat_room_message["data"]["createChatRoomMessage"]["messageId"]
-                            except Exception as error:
-                                logger.error(error)
-                                raise Exception(error)
+                                # Update the data (unread message number / message status) of the created message.
+                                update_message_data(
+                                    chat_room_id=chat_room_id,
+                                    messages_ids=[message_id]
+                                )
+                            else:
+                                # Define the message text.
+                                message_text = "🤖💬\nОбработка данного формата в данный момент невозможна."
 
-                            # Update the data (unread message number / message status) of the created message.
-                            update_message_data(
-                                chat_room_id=chat_room_id,
-                                messages_ids=[message_id]
-                            )
-                        else:
-                            # Define the message text.
-                            message_text = "🤖💬\nОбработка данного формата в данный момент невозможна."
-
-                            # Send the prepared text to the client on facebook messenger.
-                            send_message_to_facebook_messenger(
-                                facebook_messenger_bot_token=facebook_messenger_bot_token,
-                                recipient_id=sender_id,
-                                message_text=message_text
-                            )
+                                # Send the prepared text to the client on facebook messenger.
+                                send_message_to_facebook_messenger(
+                                    facebook_messenger_bot_token=facebook_messenger_bot_token,
+                                    recipient_id=sender_id,
+                                    message_text=message_text
+                                )
 
         # Return the status code 200.
         response = {
