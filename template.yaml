@@ -142,3 +142,23 @@ Resources:
       Layers:
         - 'Fn::Sub': '${DatabasesLayerARN}'
         - 'Fn::Sub': '${RequestsLayerARN}'
+    SendTemplateToFacebookMessenger:
+        Type: AWS::Serverless::Function
+        Properties:
+            FunctionName:
+                Fn::Sub: "${EnvironmentName}SendTemplateToFacebookMessenger"
+            CodeUri: src/aws_lambda_functions/send_template_to_facebook_messenger
+            Handler: lambda_function.lambda_handler
+            Events:
+                WhatsappApiGatewayEvent:
+                    Type: HttpApi
+                    Properties:
+                        ApiId:
+                            Ref: FacebookMessengerApiGateway
+                        Path: /send_template_to_facebook_messenger
+                        Method: POST
+                        Auth:
+                            Authorizer: Auth0Authorizer
+            Layers:
+                - Fn::Sub: "${DatabasesLayerARN}"
+                - Fn::Sub: "${RequestsLayerARN}"
