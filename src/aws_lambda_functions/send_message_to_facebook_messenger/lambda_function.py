@@ -23,6 +23,7 @@ POSTGRESQL_DB_NAME = os.environ["POSTGRESQL_DB_NAME"]
 APPSYNC_CORE_API_URL = os.environ["APPSYNC_CORE_API_URL"]
 APPSYNC_CORE_API_KEY = os.environ["APPSYNC_CORE_API_KEY"]
 FACEBOOK_API_URL = "https://graph.facebook.com/v9.0"
+FILE_STORAGE_SERVICE_URL = os.environ["FILE_STORAGE_SERVICE_URL"]
 
 # The connection to the database will be created the first time the AWS Lambda function is called.
 # Any subsequent call to the function will use the same database connection until the container stops.
@@ -366,7 +367,104 @@ def create_chat_room_message(**kwargs) -> Dict[AnyStr, Any]:
     return response.json()
 
 
-def send_message_to_facebook_messenger(**kwargs) -> None:
+def get_the_presigned_url(**kwargs) -> AnyStr:
+    # Check if the input dictionary has all the necessary keys.
+    try:
+        file_url = kwargs["file_url"]
+    except KeyError as error:
+        logger.error(error)
+        raise Exception(error)
+
+    # Create the request URL address.
+    request_url = "{0}/get_presigned_url_to_download_file".format(FILE_STORAGE_SERVICE_URL)
+
+    # Create the parameters.
+    parameters = {
+        "key": file_url.split('/', 3)[-1]
+    }
+
+    # Execute GET request.
+    try:
+        response = requests.get(request_url, params=parameters)
+        response.raise_for_status()
+    except Exception as error:
+        logger.error(error)
+        raise Exception(error)
+
+    # Define the value of the presigned url of the document.
+    try:
+        presigned_url = response.json()["data"]
+    except Exception as error:
+        logger.error(error)
+        raise Exception(error)
+
+    # Return the value of the presigned url.
+    return presigned_url
+
+
+def send_attachment_to_facebook_messenger(**kwargs) -> None:
+    # Check if the input dictionary has all the necessary keys.
+    try:
+        facebook_messenger_bot_token = kwargs["facebook_messenger_bot_token"]
+    except KeyError as error:
+        logger.error(error)
+        raise Exception(error)
+    try:
+        facebook_messenger_chat_id = kwargs["facebook_messenger_chat_id"]
+    except KeyError as error:
+        logger.error(error)
+        raise Exception(error)
+    try:
+        attachment_url = kwargs["attachment_url"]
+    except KeyError as error:
+        logger.error(error)
+        raise Exception(error)
+    try:
+        attachment_category = kwargs["attachment_category"]
+    except KeyError as error:
+        logger.error(error)
+        raise Exception(error)
+
+    # Create the request URL address.
+    request_url = "{0}/me/messages".format(FACEBOOK_API_URL)
+
+    # Create the parameters.
+    parameters = {
+        "access_token": facebook_messenger_bot_token
+    }
+
+    # Define the headers.
+    headers = {
+        "Content-Type": "application/json"
+    }
+
+    # Define the JSON object body of the POST request.
+    data = {
+        "recipient": {
+            "id": facebook_messenger_chat_id
+        },
+        "attachment": {
+            "type": attachment_category,
+            "payload": {
+                "url": attachment_url,
+                "is_reusable": False
+            }
+        }
+    }
+
+    # Execute the POST request.
+    try:
+        response = requests.post(request_url, params=parameters, headers=headers, data=json.dumps(data))
+        response.raise_for_status()
+    except Exception as error:
+        logger.error(error)
+        raise Exception(error)
+
+    # Return nothing.
+    return None
+
+
+def send_message_text_to_facebook_messenger(**kwargs) -> None:
     # Check if the input dictionary has all the necessary keys.
     try:
         facebook_messenger_bot_token = kwargs["facebook_messenger_bot_token"]
@@ -449,6 +547,7 @@ def lambda_handler(event, context):
     input_arguments = results_of_tasks["input_arguments"]
     chat_room_id = input_arguments.get("chat_room_id", None)
     message_text = input_arguments.get("message_text", None)
+    message_content = input_arguments.get("message_content", None)
 
     # Define the instances of the database connections.
     postgresql_connection = results_of_tasks["postgresql_connection"]
@@ -476,12 +575,48 @@ def lambda_handler(event, context):
     # Send the message to the operator and save it in the database.
     chat_room_message = create_chat_room_message(input_arguments=input_arguments)
 
+    # Check the value of the message content.
+    if message_content is not None:
+        # Define the list of files.
+        files = json.loads(message_content)
+
+        for file in files:
+            # Define the category of the file.
+            file_category = file["category"]
+
+            # Defile the url address of the file.
+            file_url = file["url"]
+
+            if file_category == "gif":
+                send_attachment_to_facebook_messenger(
+                    facebook_messenger_bot_token=facebook_messenger_bot_token,
+                    attachment_url=file_url,
+                    attachment_category="image",
+                    facebook_messenger_chat_id=facebook_messenger_chat_id,
+                )
+            elif file_category == "document":
+                send_attachment_to_facebook_messenger(
+                    facebook_messenger_bot_token=facebook_messenger_bot_token,
+                    attachment_url=get_the_presigned_url(file_url=file_url),
+                    attachment_category="file",
+                    facebook_messenger_chat_id=facebook_messenger_chat_id,
+                )
+            elif file_category == "image" or file_category == "video" or file_category == "audio":
+                send_attachment_to_facebook_messenger(
+                    facebook_messenger_bot_token=facebook_messenger_bot_token,
+                    attachment_url=get_the_presigned_url(file_url=file_url),
+                    attachment_category=file_category,
+                    facebook_messenger_chat_id=facebook_messenger_chat_id,
+                )
+            else:
+                pass
     # Send the prepared text to the client in the facebook messenger.
-    send_message_to_facebook_messenger(
-        facebook_messenger_bot_token=facebook_messenger_bot_token,
-        message_text=message_text,
-        facebook_messenger_chat_id=facebook_messenger_chat_id
-    )
+    if message_text is not None:
+        send_message_text_to_facebook_messenger(
+            facebook_messenger_bot_token=facebook_messenger_bot_token,
+            message_text=message_text,
+            facebook_messenger_chat_id=facebook_messenger_chat_id
+        )
 
     # Return the status code 200.
     return {
