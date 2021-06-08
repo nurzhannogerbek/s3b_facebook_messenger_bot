@@ -9,6 +9,10 @@ from threading import Thread
 from queue import Queue
 import requests
 import databases
+from PIL import Image
+from io import BytesIO
+from urllib.parse import urlparse
+import cv2
 
 # Configure the logging tool in the AWS Lambda function.
 logger = logging.getLogger(__name__)
@@ -24,6 +28,7 @@ APPSYNC_CORE_API_URL = os.environ["APPSYNC_CORE_API_URL"]
 APPSYNC_CORE_API_KEY = os.environ["APPSYNC_CORE_API_KEY"]
 FACEBOOK_API_URL = "https://graph.facebook.com/v9.0"
 FACEBOOK_MESSENGER_BOT_VERIFY_TOKEN = os.environ["FACEBOOK_MESSENGER_BOT_VERIFY_TOKEN"]
+FILE_STORAGE_SERVICE_URL = os.environ["FILE_STORAGE_SERVICE_URL"]
 
 # The connection to the database will be created the first time the AWS Lambda function is called.
 # Any subsequent call to the function will use the same database connection until the container stops.
@@ -648,6 +653,86 @@ def activate_closed_chat_room(**kwargs):
     return None
 
 
+def upload_file_to_s3_bucket(**kwargs) -> AnyStr:
+    # Check if the input dictionary has all the necessary keys.
+    try:
+        file_url = kwargs["file_url"]
+    except KeyError as error:
+        logger.error(error)
+        raise Exception(error)
+    try:
+        chat_room_id = kwargs["chat_room_id"]
+    except KeyError as error:
+        logger.error(error)
+        raise Exception(error)
+    try:
+        file_name = kwargs["file_name"]
+    except KeyError as error:
+        logger.error(error)
+        raise Exception(error)
+
+    # Execute GET request.
+    try:
+        response = requests.get("{}".format(file_url))
+        response.raise_for_status()
+    except Exception as error:
+        logger.error(error)
+        raise Exception(error)
+
+    # Define a dictionary of files to send to the s3 bucket url address.
+    files = {
+        "file": response.content
+    }
+
+    # Execute GET request.
+    try:
+        response = requests.get(
+            "{0}/get_presigned_url_to_upload_file".format(FILE_STORAGE_SERVICE_URL),
+            params={
+                "key": "chat_rooms/{0}/{1}".format(chat_room_id, file_name)
+            }
+        )
+        response.raise_for_status()
+    except Exception as error:
+        logger.error(error)
+        raise Exception(error)
+
+    # Define a few necessary variables.
+    try:
+        request_url = response.json()["data"]["url"]
+        original_file_url = response.json()["url"]
+        key = response.json()["data"]["fields"]["key"]
+        x_amz_algorithm = response.json()["data"]["fields"]["x-amz-algorithm"]
+        x_amz_credential = response.json()["data"]["fields"]["x-amz-credential"]
+        x_amz_date = response.json()["data"]["fields"]["x-amz-date"]
+        policy = response.json()["data"]["fields"]["policy"]
+        x_amz_signature = response.json()["data"]["fields"]["x-amz-signature"]
+    except Exception as error:
+        logger.error(error)
+        raise Exception(error)
+
+    # Define the JSON object body of the POST request.
+    data = {
+        "key": key,
+        "x-amz-algorithm": x_amz_algorithm,
+        "x-amz-credential": x_amz_credential,
+        "x-amz-date": x_amz_date,
+        "policy": policy,
+        "x-amz-signature": x_amz_signature
+    }
+
+    # Execute POST request.
+    try:
+        response = requests.post(request_url, data=data, files=files)
+        response.raise_for_status()
+    except Exception as error:
+        logger.error(error)
+        raise Exception(error)
+
+    # Return the original url address of the file.
+    return original_file_url
+
+
 def create_chat_room_message(**kwargs):
     # Check if the input dictionary has all the necessary keys.
     try:
@@ -852,6 +937,110 @@ def update_message_data(**kwargs):
     return None
 
 
+def form_message_format(**kwargs):
+    # Check if the input dictionary has all the necessary keys.
+    try:
+        message = kwargs["message"]
+    except KeyError as error:
+        logger.error(error)
+        raise Exception(error)
+    try:
+        chat_room_id = kwargs["chat_room_id"]
+    except KeyError as error:
+        logger.error(error)
+        raise Exception(error)
+
+    # Define a few necessary variables.
+    message_text = message.get("text", None)
+    message_attachments = message.get("attachments", None)
+    message_content = []
+
+    if message_attachments is not None:
+        for attachment in message_attachments:
+            attachment_info = requests.get(attachment["payload"]["url"])
+            attachment_file_name = os.path.basename(urlparse(attachment["payload"]["url"]).path)
+            attachment_file_extension = os.path.splitext(attachment_file_name)[1]
+            if attachment["type"] == "file":
+                message_content.append(
+                    {
+                        "category": "document",
+                        "fileName": attachment_file_name,
+                        "fileExtension": attachment_file_extension,
+                        "fileSize": attachment_info.headers["Content-Length"],
+                        "mimeType": attachment_info.headers["Content-Type"],
+                        "url": upload_file_to_s3_bucket(
+                            file_url=attachment["payload"]["url"],
+                            chat_room_id=chat_room_id,
+                            file_name=attachment_file_name
+                        )
+                    }
+                )
+            if attachment["type"] == "image":
+                width, height = Image.open(BytesIO(attachment_info.content)).size
+                message_content.append(
+                    {
+                        "category": "image",
+                        "fileName": attachment_file_name,
+                        "fileExtension": attachment_file_extension,
+                        "fileSize": attachment_info.headers["Content-Length"],
+                        "mimeType": attachment_info.headers["Content-Type"],
+                        "url": upload_file_to_s3_bucket(
+                            file_url=attachment["payload"]["url"],
+                            chat_room_id=chat_room_id,
+                            file_name=attachment_file_name
+                        ),
+                        "dimensions": {
+                            "width": width,
+                            "height": height
+                        }
+                    }
+                )
+            if attachment["type"] == "audio":
+                message_content.append(
+                    {
+                        "category": "audio",
+                        "fileName": attachment_file_name,
+                        "fileExtension": attachment_file_extension,
+                        "fileSize": attachment_info.headers["Content-Length"],
+                        "mimeType": attachment_info.headers["Content-Type"],
+                        "url": upload_file_to_s3_bucket(
+                            file_url=attachment["payload"]["url"],
+                            chat_room_id=chat_room_id,
+                            file_name=attachment_file_name
+                        )
+                    }
+                )
+            if attachment["type"] == "video":
+                v_cap = cv2.VideoCapture(attachment["payload"]["url"])
+                width = v_cap.get(cv2.cv.CV_CAP_PROP_FRAME_WIDTH)
+                height = v_cap.get(cv2.cv.CV_CAP_PROP_FRAME_HEIGHT)
+                message_content.append(
+                    {
+                        "category": "video",
+                        "fileName": attachment_file_name,
+                        "fileExtension": attachment_file_extension,
+                        "fileSize": attachment_info.headers["Content-Length"],
+                        "mimeType": attachment_info.headers["Content-Type"],
+                        "url": upload_file_to_s3_bucket(
+                            file_url=attachment["payload"]["url"],
+                            chat_room_id=chat_room_id,
+                            file_name=attachment_file_name
+                        ),
+                        "dimensions": {
+                            "width": width,
+                            "height": height
+                        }
+                    }
+                )
+    else:
+        message_content = None
+
+    print('Message Content: ', message_content)
+
+    # Return the content of the message.
+    return message_text, message_content
+
+
 def lambda_handler(event, context):
     """
     :param event: The AWS Lambda function uses this parameter to pass in event data to the handler.
@@ -892,9 +1081,6 @@ def lambda_handler(event, context):
 
                     # Check if it's the "message" and not the "read status" or the "reaction".
                     if message:
-                        # Define the value of the message text.
-                        message_text = message.get("text", None)
-
                         # Define the value of the facebook application id.
                         app_id = message.get("app_id", None)
 
@@ -930,109 +1116,102 @@ def lambda_handler(event, context):
                         # Check the value of the facebook messenger bot token.
                         # The value can be none if the message is sent on behalf of the business page.
                         if facebook_messenger_bot_token:
-                            # Check if message text is available.
-                            if message_text:
-                                # Make up the content value of the last chat room message.
-                                last_message_content = json.dumps({
-                                    "messageText": message_text,
-                                    "messageContent": None
-                                })
+                            # Get the aggregated data.
+                            aggregated_data = get_aggregated_data(
+                                postgresql_connection=postgresql_connection,
+                                sql_arguments={
+                                    "facebook_messenger_chat_id": "{0}:{1}".format(recipient_id, sender_id)
+                                }
+                            )
 
-                                # Get the aggregated data.
-                                aggregated_data = get_aggregated_data(
+                            # Define several variables that will be used in the future.
+                            if aggregated_data is not None:
+                                chat_room_id = aggregated_data["chat_room_id"]
+                                channel_id = aggregated_data["channel_id"]
+                                chat_room_status = aggregated_data["chat_room_status"]
+                                client_id = aggregated_data["client_id"]
+                            else:
+                                chat_room_id, channel_id, chat_room_status, client_id = None, None, None, None
+
+                            # Define the value of the message text.
+                            message_text, message_content = form_message_format(
+                                message=message,
+                                chat_room_id=chat_room_id
+                            )
+                            # Form the message content values.
+                            last_message_content = json.dumps({
+                                "messageText": message_text,
+                                "messageContent": message_content
+                            })
+                            message_content = json.dumps(message_content) if message_content is not None else None
+                            # Check the chat room status.
+                            if chat_room_status is None:
+                                # Check whether the user was registered in the system earlier.
+                                client_id = get_identified_user_data(
                                     postgresql_connection=postgresql_connection,
                                     sql_arguments={
-                                        "facebook_messenger_chat_id": "{0}:{1}".format(recipient_id, sender_id)
+                                        "facebook_messenger_psid": sender_id
                                     }
                                 )
 
-                                # Define several variables that will be used in the future.
-                                if aggregated_data is not None:
-                                    chat_room_id = aggregated_data["chat_room_id"]
-                                    channel_id = aggregated_data["channel_id"]
-                                    chat_room_status = aggregated_data["chat_room_status"]
-                                    client_id = aggregated_data["client_id"]
-                                else:
-                                    chat_room_id, channel_id, chat_room_status, client_id = None, None, None, None
-
-                                # Check the chat room status.
-                                if chat_room_status is None:
-                                    # Check whether the user was registered in the system earlier.
-                                    client_id = get_identified_user_data(
+                                # Create the new user.
+                                if client_id is None:
+                                    client_id = create_identified_user(
                                         postgresql_connection=postgresql_connection,
                                         sql_arguments={
                                             "facebook_messenger_psid": sender_id
-                                        }
+                                        },
+                                        facebook_messenger_bot_token=facebook_messenger_bot_token
                                     )
 
-                                    # Create the new user.
-                                    if client_id is None:
-                                        client_id = create_identified_user(
-                                            postgresql_connection=postgresql_connection,
-                                            sql_arguments={
-                                                "facebook_messenger_psid": sender_id
-                                            },
-                                            facebook_messenger_bot_token=facebook_messenger_bot_token
-                                        )
-
-                                    # Create the new chat room.
-                                    chat_room = create_chat_room(
-                                        channel_technical_id=facebook_messenger_bot_token,
-                                        client_id=client_id,
-                                        last_message_content=last_message_content,
-                                        facebook_messenger_chat_id="{0}:{1}".format(recipient_id, sender_id)
-                                    )
-
-                                    # Define a few necessary variables that will be used in the future.
-                                    try:
-                                        chat_room_id = chat_room["data"]["createChatRoom"]["chatRoomId"]
-                                    except Exception as error:
-                                        logger.error(error)
-                                        raise Exception(error)
-                                    try:
-                                        channel_id = chat_room["data"]["createChatRoom"]["channelId"]
-                                    except Exception as error:
-                                        logger.error(error)
-                                        raise Exception(error)
-                                elif chat_room_status == "completed":
-                                    # Activate closed chat room before sending a message to the operator.
-                                    activate_closed_chat_room(
-                                        chat_room_id=chat_room_id,
-                                        client_id=client_id,
-                                        last_message_content=last_message_content
-                                    )
-
-                                # Send the message to the operator and save it in the database.
-                                chat_room_message = create_chat_room_message(
-                                    chat_room_id=chat_room_id,
-                                    message_author_id=client_id,
-                                    message_channel_id=channel_id,
-                                    message_text=message_text,
-                                    message_content=None
+                                # Create the new chat room.
+                                chat_room = create_chat_room(
+                                    channel_technical_id=facebook_messenger_bot_token,
+                                    client_id=client_id,
+                                    last_message_content=last_message_content,
+                                    facebook_messenger_chat_id="{0}:{1}".format(recipient_id, sender_id)
                                 )
 
-                                # Define the id of the created message.
+                                # Define a few necessary variables that will be used in the future.
                                 try:
-                                    message_id = chat_room_message["data"]["createChatRoomMessage"]["messageId"]
+                                    chat_room_id = chat_room["data"]["createChatRoom"]["chatRoomId"]
                                 except Exception as error:
                                     logger.error(error)
                                     raise Exception(error)
-
-                                # Update the data (unread message number / message status) of the created message.
-                                update_message_data(
+                                try:
+                                    channel_id = chat_room["data"]["createChatRoom"]["channelId"]
+                                except Exception as error:
+                                    logger.error(error)
+                                    raise Exception(error)
+                            elif chat_room_status == "completed":
+                                # Activate closed chat room before sending a message to the operator.
+                                activate_closed_chat_room(
                                     chat_room_id=chat_room_id,
-                                    messages_ids=[message_id]
+                                    client_id=client_id,
+                                    last_message_content=last_message_content
                                 )
-                            else:
-                                # Define the message text.
-                                message_text = "🤖💬\nОбработка данного формата в данный момент невозможна."
 
-                                # Send the prepared text to the client on facebook messenger.
-                                send_message_to_facebook_messenger(
-                                    facebook_messenger_bot_token=facebook_messenger_bot_token,
-                                    recipient_id=sender_id,
-                                    message_text=message_text
-                                )
+                            # Send the message to the operator and save it in the database.
+                            chat_room_message = create_chat_room_message(
+                                chat_room_id=chat_room_id,
+                                message_author_id=client_id,
+                                message_channel_id=channel_id,
+                                message_text=message_text,
+                                message_content=message_content
+                            )
+
+                            # Define the id of the created message.
+                            try:
+                                message_id = chat_room_message["data"]["createChatRoomMessage"]["messageId"]
+                            except Exception as error:
+                                logger.error(error)
+                                raise Exception(error)
+
+                            # Update the data (unread message number / message status) of the created message.
+                            update_message_data(
+                                chat_room_id=chat_room_id,
+                                messages_ids=[message_id]
+                            )
 
         # Return the status code 200.
         response = {
