@@ -29,6 +29,8 @@ Parameters:
     Type: String
   RequestsLayerARN:
     Type: String
+  OpenCVLayerARN:
+    Type: String
   FileStorageServiceUrl:
     Type: String
 Globals:
@@ -106,6 +108,7 @@ Resources:
       Layers:
         - 'Fn::Sub': '${DatabasesLayerARN}'
         - 'Fn::Sub': '${RequestsLayerARN}'
+        - 'Fn::Sub': '${OpenCVLayerARN}'
   SendMessageToFacebookMessenger:
     Type: 'AWS::Serverless::Function'
     Properties:

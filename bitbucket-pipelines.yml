@@ -12,15 +12,15 @@ deploy:
         - >-
           export DATABASES_LAYER_ARN=$(aws lambda list-layer-versions
           --layer-name $DATABASES_LAYER_NAME --query 'max_by(LayerVersions,
-          &Version).LayerVersionArn'  --output text)
+          &Version).LayerVersionArn' --output text)
         - >-
           export REQUESTS_LAYER_ARN=$(aws lambda list-layer-versions
           --layer-name $REQUESTS_LAYER_NAME --query 'max_by(LayerVersions,
-          &Version).LayerVersionArn'  --output text)
+          &Version).LayerVersionArn' --output text)
         - >-
           export OPENCV_LAYER_ARN=$(aws lambda list-layer-versions
-          --layer-name $OPENCV_LAYER_ARN_LAYER_NAME --query 'max_by(LayerVersions,
-          &Version).LayerVersionArn'  --output text)
+          --layer-name $OPENCV_LAYER_NAME --query 'max_by(LayerVersions,
+          &Version).LayerVersionArn' --output text)
         - pipe: 'atlassian/aws-sam-deploy:0.5.2'
           variables:
             AWS_ACCESS_KEY_ID: $AWS_ACCESS_KEY_ID
