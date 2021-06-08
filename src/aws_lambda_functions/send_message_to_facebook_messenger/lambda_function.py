@@ -454,8 +454,6 @@ def send_attachment_to_facebook_messenger(**kwargs) -> None:
         }
     }
 
-    print('data: ', data)
-
     # Execute the POST request.
     try:
         response = requests.post(request_url, params=parameters, headers=headers, data=json.dumps(data))
@@ -598,18 +596,18 @@ def lambda_handler(event, context):
                     attachment_category="image",
                     facebook_messenger_chat_id=facebook_messenger_chat_id,
                 )
-            elif file_category == "document":
+            elif file_category == "image" or file_category == "document" or file_category == "audio":
                 send_attachment_to_facebook_messenger(
                     facebook_messenger_bot_token=facebook_messenger_bot_token,
                     attachment_url=get_the_presigned_url(file_url=file_url),
                     attachment_category="file",
                     facebook_messenger_chat_id=facebook_messenger_chat_id,
                 )
-            elif file_category == "image" or file_category == "video" or file_category == "audio":
+            elif file_category == "video":
                 send_attachment_to_facebook_messenger(
                     facebook_messenger_bot_token=facebook_messenger_bot_token,
                     attachment_url=get_the_presigned_url(file_url=file_url),
-                    attachment_category=file_category,
+                    attachment_category="video",
                     facebook_messenger_chat_id=facebook_messenger_chat_id,
                 )
             else:
