@@ -443,14 +443,18 @@ def send_attachment_to_facebook_messenger(**kwargs) -> None:
         "recipient": {
             "id": facebook_messenger_chat_id
         },
-        "attachment": {
-            "type": attachment_category,
-            "payload": {
-                "url": attachment_url,
-                "is_reusable": False
+        "message": {
+            "attachment": {
+                "type": attachment_category,
+                "payload": {
+                    "url": attachment_url,
+                    "is_reusable": False
+                }
             }
         }
     }
+
+    print('data: ', data)
 
     # Execute the POST request.
     try:
