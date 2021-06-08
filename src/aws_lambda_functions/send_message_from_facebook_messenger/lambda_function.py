@@ -9,8 +9,6 @@ from threading import Thread
 from queue import Queue
 import requests
 import databases
-from PIL import Image
-from io import BytesIO
 from urllib.parse import urlparse
 import cv2
 
@@ -976,7 +974,9 @@ def form_message_format(**kwargs):
                     }
                 )
             if attachment["type"] == "image":
-                width, height = Image.open(BytesIO(attachment_info.content)).size
+                image = cv2.imread(attachment["payload"]["url"], cv2.IMREAD_UNCHANGED)
+                height = image.shape[0]
+                width = image.shape[1]
                 message_content.append(
                     {
                         "category": "image",
