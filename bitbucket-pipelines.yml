@@ -21,10 +21,6 @@ deploy:
           export OPENCV_LAYER_ARN=$(aws lambda list-layer-versions
           --layer-name $OPENCV_LAYER_NAME --query 'max_by(LayerVersions,
           &Version).LayerVersionArn' --output text)
-        - >-
-          export SCIPY_LAYER_ARN=$(aws lambda list-layer-versions
-          --layer-name $SCIPY_LAYER_NAME --query 'max_by(LayerVersions,
-          &Version).LayerVersionArn' --output text)
         - pipe: 'atlassian/aws-sam-deploy:0.5.2'
           variables:
             AWS_ACCESS_KEY_ID: $AWS_ACCESS_KEY_ID
@@ -98,10 +94,6 @@ deploy:
                 {
                   'ParameterKey': 'OpenCVLayerARN',
                   'ParameterValue': '${OPENCV_LAYER_ARN}'
-                },
-                {
-                  'ParameterKey': 'SciPyLayerARN',
-                  'ParameterValue': '${SCIPY_LAYER_ARN}'
                 },
                 {
                   'ParameterKey': 'FileStorageServiceUrl',

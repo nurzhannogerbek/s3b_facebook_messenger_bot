@@ -31,6 +31,7 @@ Parameters:
     Type: String
   SciPyLayerARN:
     Type: String
+    Default: 'arn:aws:lambda:eu-central-1:292169987271:layer:AWSLambda-Python38-SciPy1x:29'
   OpenCVLayerARN:
     Type: String
   FileStorageServiceUrl:
