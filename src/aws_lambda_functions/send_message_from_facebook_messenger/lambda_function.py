@@ -9,8 +9,9 @@ from threading import Thread
 from queue import Queue
 import requests
 import databases
+from PIL import Image
+from io import BytesIO
 from urllib.parse import urlparse
-import cv2
 
 # Configure the logging tool in the AWS Lambda function.
 logger = logging.getLogger(__name__)
@@ -974,9 +975,7 @@ def form_message_format(**kwargs):
                     }
                 )
             if attachment["type"] == "image":
-                image = cv2.imread(attachment["payload"]["url"], cv2.IMREAD_UNCHANGED)
-                height = image.shape[0]
-                width = image.shape[1]
+                width, height = Image.open(BytesIO(attachment_info.content)).size
                 message_content.append(
                     {
                         "category": "image",
@@ -1011,9 +1010,6 @@ def form_message_format(**kwargs):
                     }
                 )
             if attachment["type"] == "video":
-                v_cap = cv2.VideoCapture(attachment["payload"]["url"])
-                width = v_cap.get(cv2.cv.CV_CAP_PROP_FRAME_WIDTH)
-                height = v_cap.get(cv2.cv.CV_CAP_PROP_FRAME_HEIGHT)
                 message_content.append(
                     {
                         "category": "video",
