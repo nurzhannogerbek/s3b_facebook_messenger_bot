@@ -1012,8 +1012,6 @@ def form_message_format(**kwargs):
     else:
         message_content = None
 
-    print('Message Content: ', message_content)
-
     # Return the content of the message.
     return message_text, message_content
 
