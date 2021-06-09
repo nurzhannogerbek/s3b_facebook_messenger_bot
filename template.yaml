@@ -29,10 +29,7 @@ Parameters:
     Type: String
   RequestsLayerARN:
     Type: String
-  SciPyLayerARN:
-    Type: String
-    Default: 'arn:aws:lambda:eu-central-1:292169987271:layer:AWSLambda-Python38-SciPy1x:29'
-  OpenCVLayerARN:
+  PillowLayerARN:
     Type: String
   FileStorageServiceUrl:
     Type: String
@@ -111,8 +108,7 @@ Resources:
       Layers:
         - 'Fn::Sub': '${DatabasesLayerARN}'
         - 'Fn::Sub': '${RequestsLayerARN}'
-        - 'Fn::Sub': '${OpenCVLayerARN}'
-        - 'Fn::Sub': '${SciPyLayerARN}'
+        - 'Fn::Sub': '${PillowLayerARN}'
   SendMessageToFacebookMessenger:
     Type: 'AWS::Serverless::Function'
     Properties:
