@@ -959,7 +959,7 @@ def form_message_format(**kwargs):
             attachment_info = requests.get(attachment["payload"]["url"])
             attachment_file_name = os.path.basename(urlparse(attachment["payload"]["url"]).path)
             attachment_file_extension = os.path.splitext(attachment_file_name)[1]
-            if attachment["type"] == "file":
+            if attachment["type"] == "file" or attachment["type"] == "video":
                 message_content.append(
                     {
                         "category": "document",
@@ -1007,25 +1007,6 @@ def form_message_format(**kwargs):
                             chat_room_id=chat_room_id,
                             file_name=attachment_file_name
                         )
-                    }
-                )
-            if attachment["type"] == "video":
-                message_content.append(
-                    {
-                        "category": "video",
-                        "fileName": attachment_file_name,
-                        "fileExtension": attachment_file_extension,
-                        "fileSize": attachment_info.headers["Content-Length"],
-                        "mimeType": attachment_info.headers["Content-Type"],
-                        "url": upload_file_to_s3_bucket(
-                            file_url=attachment["payload"]["url"],
-                            chat_room_id=chat_room_id,
-                            file_name=attachment_file_name
-                        ),
-                        "dimensions": {
-                            "width": width,
-                            "height": height
-                        }
                     }
                 )
     else:
