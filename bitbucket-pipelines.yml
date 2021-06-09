@@ -18,8 +18,8 @@ deploy:
           --layer-name $REQUESTS_LAYER_NAME --query 'max_by(LayerVersions,
           &Version).LayerVersionArn' --output text)
         - >-
-          export OPENCV_LAYER_ARN=$(aws lambda list-layer-versions
-          --layer-name $OPENCV_LAYER_NAME --query 'max_by(LayerVersions,
+          export PILLOW_LAYER_ARN=$(aws lambda list-layer-versions
+          --layer-name $PILLOW_LAYER_NAME --query 'max_by(LayerVersions,
           &Version).LayerVersionArn' --output text)
         - pipe: 'atlassian/aws-sam-deploy:0.5.2'
           variables:
@@ -92,8 +92,8 @@ deploy:
                   'ParameterValue': '${REQUESTS_LAYER_ARN}'
                 },
                 {
-                  'ParameterKey': 'OpenCVLayerARN',
-                  'ParameterValue': '${OPENCV_LAYER_ARN}'
+                  'ParameterKey': 'PillowLayerARN',
+                  'ParameterValue': '${PILLOW_LAYER_ARN}'
                 },
                 {
                   'ParameterKey': 'FileStorageServiceUrl',
