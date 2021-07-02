@@ -22,7 +22,7 @@ POSTGRESQL_PORT = int(os.environ["POSTGRESQL_PORT"])
 POSTGRESQL_DB_NAME = os.environ["POSTGRESQL_DB_NAME"]
 APPSYNC_CORE_API_URL = os.environ["APPSYNC_CORE_API_URL"]
 APPSYNC_CORE_API_KEY = os.environ["APPSYNC_CORE_API_KEY"]
-FACEBOOK_API_URL = "https://graph.facebook.com/v9.0"
+FACEBOOK_API_URL = "https://graph.facebook.com/v11.0"
 FILE_STORAGE_SERVICE_URL = os.environ["FILE_STORAGE_SERVICE_URL"]
 
 # The connection to the database will be created the first time the AWS Lambda function is called.
